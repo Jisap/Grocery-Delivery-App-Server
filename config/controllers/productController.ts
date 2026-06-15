@@ -52,7 +52,7 @@ export const getProducts = async (req: Request, res: Response) => {
 }
 
 // GET /api/products/:id
-export const getProductsById = async (req: Request, res: Response) => {
+export const getProduct = async (req: Request, res: Response) => {
   const product = await prisma.product.findUnique({
     where: { id: req.params.id as string }
   });
@@ -89,7 +89,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
   const product = await prisma.product.delete({
     where: { id: req.params.id as string }
   });
-  res.json({ product })
+  res.json({ message: "Deleted" })
 };
 
 
