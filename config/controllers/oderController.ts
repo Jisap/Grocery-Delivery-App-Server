@@ -251,7 +251,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 
 export const getAllOrders = async (req: Request, res: Response) => {
   const orders = await prisma.order.findMany({                                              // Buscamos las órdenes del usuario con filtros aplicados
-    where: { NOT: [{ paymentMethod: "card", isPaid: false }] },                               // Excluimos órdenes pagadas con tarjeta que aún no están pagadas
+    where: { NOT: [{ paymentMethod: "card", isPaid: false }] },                             // Excluimos órdenes pagadas con tarjeta que aún no están pagadas
     include: {                                                                              // Incluimos datos del usuario y del repartidor
       user: { select: { name: true, email: true } },
       deliveryPartner: { select: { name: true, phone: true } }
@@ -261,3 +261,26 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
   res.json({ orders })
 };
+
+// Get Order Location
+// GET /api/orders/:id/location
+
+export const getOrderLocation = async (req: Request, res: Response) => {
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id as string, userId: req.user!.id },
+      select: { liveLocation: true, status: true },
+    });
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    res.json({
+      liveLocation: order.liveLocation,
+      status: order.status
+    })
+
+
+  } catch (error: any) {
+    res.status(400).json({ message: error.message ?? "Could not get order location" });
+  }
+}
