@@ -164,3 +164,27 @@ export const createOrder = async (req: Request, res: Response) => {
     res.status(400).json({ message: err.message ?? "Could not create order" });
   }
 };
+
+// Get user's orders
+// GET /api/orders
+
+export const getUserOrders = async (req: Request, res: Response) => {
+  const { status } = req.query;                                           // status será "Placed", "Confirmed", "Shipped", "Delivered", "Cancelled" o undefined
+
+  const where: any = {                                                    // Objeto que define filtros de búsqueda para órdenes
+    userId: req.user!.id,                                                 // Filtra solo órdenes del usuario actual
+    NOT: [{ PaymentMethod: "card", isPaid: false }]                       // Excluye órdenes pagadas con tarjeta que aún no están pagadas
+  }
+
+  if (status && status !== "all") {                                       // Si recibimos parámetro de status
+    where.status = status;                                                // Filtramos por el estado recibido
+  }
+
+  const orders = await prisma.order.findMany({                            // Buscamos las órdenes del usuario con filtros aplicados
+    where,                                                                // Filtros de búsqueda definidos arriba
+    include: { deliveryPartner: { select: { name: true, phone: true } } },   // Incluye datos del repartidor
+    orderBy: { createdAt: "desc" }                                        // Ordena por fecha de creación descendente
+  });
+
+  res.json({ orders })
+};
