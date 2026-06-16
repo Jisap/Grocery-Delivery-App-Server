@@ -3,12 +3,12 @@ import auth from "../middleware/auth.js";
 import multer from "multer";
 import cloudinary from "../config/cloudinary.js";
 
-const router = express.Router();
+const uploadRouter = express.Router();
 
 const storage = multer.memoryStorage(); // We use memory storage to store the file in memory
 const upload = multer({ storage });     // We use multer to upload the file
 
-router.post('/', auth, upload.single('image'), async (req: Request, res: Response) => {
+uploadRouter.post('/', auth, upload.single('image'), async (req: Request, res: Response) => {
   try {
     const file = req.file;
     if (!file) {
@@ -31,4 +31,4 @@ router.post('/', auth, upload.single('image'), async (req: Request, res: Respons
   }
 })
 
-export default router;
+export default uploadRouter;
