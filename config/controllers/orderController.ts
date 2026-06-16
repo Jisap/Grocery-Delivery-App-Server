@@ -267,14 +267,17 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
 export const getOrderLocation = async (req: Request, res: Response) => {
   try {
-    const order = await prisma.order.findFirst({
-      where: { id: req.params.id as string, userId: req.user!.id },
-      select: { liveLocation: true, status: true },
+    const order = await prisma.order.findFirst({                                            // Se busca la orden por                                                                 
+      where: {
+        id: req.params.id as string,                                                        // ID de la orden que viene en el url
+        userId: req.user!.id                                                                // ID del usuario actual
+      },
+      select: { liveLocation: true, status: true },                                         // Seleccionamos solo la ubicación en tiempo real y el estado de la orden
     });
 
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    res.json({
+    res.json({                                                                              // Respondemos con la ubicación en tiempo real y el estado de la orden
       liveLocation: order.liveLocation,
       status: order.status
     })
