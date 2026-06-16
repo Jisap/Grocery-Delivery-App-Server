@@ -245,3 +245,19 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     res.status(400).json({ message: error.message ?? "Could not get order" });
   }
 }
+
+// Get all orders (admin)
+// GET /api/orders/all
+
+export const getAllOrders = async (req: Request, res: Response) => {
+  const orders = await prisma.order.findMany({                                              // Buscamos las órdenes del usuario con filtros aplicados
+    where: { NOT: [{ paymentMethod: "card", isPaid: false }] },                               // Excluimos órdenes pagadas con tarjeta que aún no están pagadas
+    include: {                                                                              // Incluimos datos del usuario y del repartidor
+      user: { select: { name: true, email: true } },
+      deliveryPartner: { select: { name: true, phone: true } }
+    },
+    orderBy: { createdAt: "desc" }                                                          // Ordena por fecha de creación descendente
+  });
+
+  res.json({ orders })
+};
