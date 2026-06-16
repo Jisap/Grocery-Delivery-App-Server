@@ -169,22 +169,79 @@ export const createOrder = async (req: Request, res: Response) => {
 // GET /api/orders
 
 export const getUserOrders = async (req: Request, res: Response) => {
-  const { status } = req.query;                                           // status será "Placed", "Confirmed", "Shipped", "Delivered", "Cancelled" o undefined
+  const { status } = req.query;                                                             // status será "Placed", "Confirmed", "Shipped", "Delivered", "Cancelled" o undefined
 
-  const where: any = {                                                    // Objeto que define filtros de búsqueda para órdenes
-    userId: req.user!.id,                                                 // Filtra solo órdenes del usuario actual
-    NOT: [{ PaymentMethod: "card", isPaid: false }]                       // Excluye órdenes pagadas con tarjeta que aún no están pagadas
+  const where: any = {                                                                      // Objeto que define filtros de búsqueda para órdenes
+    userId: req.user!.id,                                                                   // Filtra solo órdenes del usuario actual
+    NOT: [{ PaymentMethod: "card", isPaid: false }]                                         // Excluye órdenes pagadas con tarjeta que aún no están pagadas
   }
 
-  if (status && status !== "all") {                                       // Si recibimos parámetro de status
-    where.status = status;                                                // Filtramos por el estado recibido
+  if (status && status !== "all") {                                                         // Si recibimos parámetro de status
+    where.status = status;                                                                  // Filtramos por el estado recibido
   }
 
-  const orders = await prisma.order.findMany({                            // Buscamos las órdenes del usuario con filtros aplicados
-    where,                                                                // Filtros de búsqueda definidos arriba
-    include: { deliveryPartner: { select: { name: true, phone: true } } },   // Incluye datos del repartidor
-    orderBy: { createdAt: "desc" }                                        // Ordena por fecha de creación descendente
+  const orders = await prisma.order.findMany({                                              // Buscamos las órdenes del usuario con filtros aplicados
+    where,                                                                                  // Filtros de búsqueda definidos arriba
+    include: { deliveryPartner: { select: { name: true, phone: true } } },                  // Incluye datos del repartidor
+    orderBy: { createdAt: "desc" }                                                          // Ordena por fecha de creación descendente
   });
 
   res.json({ orders })
 };
+
+// Get single order
+// GET /api/orders/:id
+
+export const getOrder = async (req: Request, res: Response) => {
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id as string, userId: req.user!.id },
+      include: { deliveryPartner: { select: { name: true, phone: true, avatar: true, vehicleType: true } } },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    res.json({ order });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message ?? "Could not get order" });
+  }
+}
+
+// Update order status (admin)
+// PUT /api/orders/:id/status
+
+export const updateOrderStatus = async (req: Request, res: Response) => {
+  try {
+    const { status, note } = req.body;                                                          // Se recibe el status del body de la petición.
+
+    const order = await prisma.order.findUnique({                                             // Se busca la orden por id que viene el url                                                                
+      where: { id: req.params.id as string },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const history = (Array.isArray(order.statusHistory)                                        // Si order.statusHistory es un array, lo asigna a history, si no, lo asigna a un array vacío.
+      ? order.statusHistory
+      : []
+    ) as any[];
+
+    history.push({                                                                             // Añadimos el nuevo estado al historial.
+      status, note: note || `Order ${status.toLowerCase()}`,
+      timestamp: new Date()
+    });
+
+    const updatedOrder = await prisma.order.update({                                           // Actualizamos la orden con el nuevo estado.
+      where: { id: req.params.id as string },
+      data: { status, statusHistory: history }
+    })
+
+    res.json({ order: updatedOrder });                                                          // Respondemos con la orden actualizada.
+
+  } catch (error: any) {
+    res.status(400).json({ message: error.message ?? "Could not get order" });
+  }
+}
