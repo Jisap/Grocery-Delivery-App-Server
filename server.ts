@@ -5,12 +5,15 @@ import authRouter from "./routes/authRoutes.js";
 import productRouter from "./routes/productRoute.js";
 import uploadRouter from "./routes/uploadRoutes.js";
 import orderRouter from "./routes/orderRoutes.js";
+import { serve } from "inngest/express";
+import { inngest, functions } from "./inngest/index.js"
 
 const app = express();
 
 // Middleware
 app.use(cors())
 app.use(express.json());
+
 
 const port = process.env.PORT || 3000;
 
@@ -22,6 +25,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/products', productRouter)
 app.use('/api/uploads', uploadRouter)
 app.use('/api/orders', orderRouter)
+app.use("/api/inngest", serve({ client: inngest, functions }));
 
 // Error handling
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {
