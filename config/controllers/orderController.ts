@@ -5,6 +5,7 @@
 
 import { Request, Response } from "express";
 import { prisma } from "../prisma.js";
+import { inngest } from "../../inngest/index.js";
 
 // // POST /api/orders
 // export const createOrder = async (req: Request, res: Response) => {
@@ -157,6 +158,20 @@ export const createOrder = async (req: Request, res: Response) => {
       }
 
       return created;
+    });
+
+    // Enviar eventos a Inngest fuera de la transacción
+    const orderItems = order.items as any[];
+    for (const item of orderItems) {
+      await inngest.send({
+        name: "inventory/stock.updated",
+        data: { productId: item.product },
+      });
+    }
+
+    await inngest.send({
+      name: "order/placed",
+      data: { orderId: order.id },
     });
 
     res.json({ order });
