@@ -104,6 +104,82 @@ const sendMonthlyOffers = inngest.createFunction({
 	}
 })
 
+// Auto-Assign Rider after 5 minutes
+const autoAssignRider = inngest.createFunction({
+	id: "auto-assign-rider",
+	name: "Auto Assign Delivery Rider",
+	triggers: [{ event: "order/placed" }]
+}, async ({ event, step }) => {
+	const { orderId } = event.data;
+
+	// Wait 5 minutes before attempting assignment
+	await step.sleep("wait-5-min", "5m");
+
+	const result = await step.run("assign-rider", async () => {
+		const order = await prisma.order.findUnique({                           // busca la orden por id
+			where: { id: orderId },
+		})
+
+		if (!order) return { skipped: true, reason: "Order not found" }                                                              // Si no existe la orden salta esta funcion
+		if (order.deliveryPartnerId) return { skipped: true, reason: "Already assigned" }                                            // Si ya tiene un repartidor asignado salta esta funcion
+		if (["Cancelled", "Delivered"].includes(order.status as string)) return { skipped: true, reason: `Order is ${order.status}` } // Si la orden esta cancelada o entregada salta esta funcion
+
+		// Find an active rider not currently delivering
+		const busyOrders = await prisma.order.findMany({                        // Busca las ordenes que esten asignadas, empaquetadas o en camino
+			where: {
+				status: { in: ["Assigned", "Packed", "Out for Delivery"] },
+				deliveryPartnerId: { not: null }
+			},
+			select: { deliveryPartnerId: true },                                  // Coge solo el id del repartidor
+		})
+
+		const busyRiderIds = busyOrders.map((o) => {                            // Coge todos los id's de los repartidores ocupados
+			return o.deliveryPartnerId
+		})
+
+		const availableRider = await prisma.deliveryPartner.findFirst({         // Busca el primer repartidor que este activo y no este ocupado
+			where: {
+				isActive: true,
+				id: { notIn: busyRiderIds as string[] }
+			}
+		})
+
+		if (!availableRider) return { skipped: true, reason: "No available riders" }
+
+		// Generate 6-digit OTP
+		const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+		const history = (Array.isArray(order.statusHistory)                     // Creo un historial si no existe en la order
+			? order.statusHistory
+			: []) as any[];
+
+		history.push({                                                          // Añade el estado actual al historial
+			status: "Assigned",
+			note: `Auto-assigned to ${availableRider.name}`,
+			timestamp: new Date().toISOString()
+		})
+
+		await prisma.order.update({                                              // Actualiza la orden con el repartidor asignado, el OTP y el estado
+			where: { id: orderId },
+			data: {
+				deliveryPartnerId: availableRider.id,
+				deliveryOtp: otp,
+				status: "Assigned",
+				statusHistory: history
+			}
+		})
+
+		return {                                                                 // Retorna el resultado
+			assigned: true,
+			riderId: availableRider.id,
+			riderName: availableRider.name,
+			orderId: orderId
+		};
+	})
+
+	return result;
+})
+
 
 // Create an empty array where we'll export future Inngest functions
 export const functions = [checkLowStock, sendMonthlyOffers];
