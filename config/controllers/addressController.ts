@@ -107,3 +107,25 @@ export const updateAddress = async (req: Request, res: Response) => {
 		addresses
 	})
 }
+
+// Delete address
+// DELETE /api/addresses/:id
+
+export const deleteAddress = async (req: Request, res: Response) => {
+	try {
+		await prisma.address.delete({
+			where: { id: req.params.id as string }
+		})
+	} catch (error: any) {
+		console.log(error.message)
+	}
+
+	const addresses = await prisma.address.findMany({                                                            // Se buscan todas las direcciones (actualizadas) del usuario autenticado.
+		where: { userId: req.user!.id },
+		orderBy: { createdAt: "asc" }                                                                              // Se ordenan por fecha de creación ascendente para que la más antigua aparezca primero.
+	})
+
+	res.json({
+		addresses
+	})
+}
