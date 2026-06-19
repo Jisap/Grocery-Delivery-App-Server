@@ -98,7 +98,7 @@ export const updateAddress = async (req: Request, res: Response) => {
 		return res.status(404).json({ message: "Address not found" })
 	}
 
-	const addresses = await prisma.address.findMany({                                                            // Se buscan todas las direcciones del usuario autenticado.
+	const addresses = await prisma.address.findMany({                                                            // Se buscan todas las direcciones (actualizadas) del usuario autenticado.
 		where: { userId: req.user!.id },
 		orderBy: { createdAt: "asc" }                                                                              // Se ordenan por fecha de creación ascendente para que la más antigua aparezca primero.
 	})
