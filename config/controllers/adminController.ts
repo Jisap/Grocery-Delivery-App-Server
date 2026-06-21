@@ -75,3 +75,45 @@ export const updateDeliveryPartner = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Error updating delivery partner" });
   }
 }
+
+// assign delivery partner for order
+export const assignDeliveryPartner = async (req: Request, res: Response) => {
+  const { partnerId } = req.body;                                                                     // id del repartidor (id en el body desde un input)
+  try {
+    const order = await prisma.order.findUnique({                                                     // params.id -> Order
+      where: { id: req.params.id as string },
+    });
+
+    const partner = await prisma.deliveryPartner.findUnique({                                         // partnerId -> Partner
+      where: { id: partnerId },
+    });
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000))
+
+    let status = order!.status;
+
+    const history: any[] = Array.isArray(order!.statusHistory) ? order!.statusHistory : [];           // validar que statusHistory sea un array, si no, crear un array vacio
+
+    if (order!.status === "Placed" || order!.status === "Confirmed") {                                // si la orden está en estado Placed o Confirmed
+      status = "Assigned";                                                                            // cambiar el estado a Assigned
+      history.push({
+        status: "Assigned",                                                                           // agregar el estado Assigned al historial
+        note: `Assigned to ${partner!.name}`,                                                         // agregar el note con el nombre del repartidor
+      })
+    }
+
+    await prisma.order.update({
+      where: { id: order!.id },                                                                       // actualizar la orden en bd con el id de la orden
+      data: {
+        deliveryPartnerId: partner!.id,                                                               // actualizar el id del repartidor
+        deliveryOtp: otp,                                                                             // actualizar el OTP
+        statusHistory: history                                                                        // actualizar el historial de estados
+      }
+    })
+
+    res.json({ order })                                                                               // devolver la orden actualizada
+
+  } catch (error) {
+    res.status(500).json({ message: "Error assigning order for delivery" });
+  }
+}
