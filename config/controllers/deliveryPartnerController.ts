@@ -66,5 +66,11 @@ export const getMyDeliveries = async (req: Request, res: Response) => {
         orderBy: { createdAt: "desc" }
     })
 
-    res.json({ orders })
+    res.json({ orders })                                                              // devuelve las ordenes
+}
+
+// Get single delivery detail
+// GET /api/delivery/my-deliveries/:id
+export const getDeliveryDetail = async (req: Request, res: Response) => {
+
 }
