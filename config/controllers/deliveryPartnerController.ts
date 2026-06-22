@@ -54,10 +54,10 @@ export const getMyDeliveries = async (req: Request, res: Response) => {
 
     const where: any = { deliveryPartnerId: req.partner!.id }                         // crea un objeto where con el id del partner
 
-    if (status === "active") {                                                         // si el status es active
-        where.status = { in: ["Assigned", "Packed", "Out for delivery"] }               // filtra las entregas que esten en estado Assigned, Packed u Out for delivery
-    } else if (status === "completed") {                                                // si el status es completed
-        where.status = { in: ["Delivered", "Cancelled"] }                               // filtra las entregas que esten en estado Delivered o Cancelled
+    if (status === "active") {                                                        // si el status es active
+        where.status = { in: ["Assigned", "Packed", "Out for delivery"] }             // filtra las entregas que esten en estado Assigned, Packed u Out for delivery
+    } else if (status === "completed") {                                              // si el status es completed
+        where.status = { in: ["Delivered", "Cancelled"] }                             // filtra las entregas que esten en estado Delivered o Cancelled
     }
 
     const orders = await prisma.order.findMany({
@@ -72,5 +72,17 @@ export const getMyDeliveries = async (req: Request, res: Response) => {
 // Get single delivery detail
 // GET /api/delivery/my-deliveries/:id
 export const getDeliveryDetail = async (req: Request, res: Response) => {
+    const order = await prisma.order.findFirst({
+        where: {
+            id: req.params.id as string,
+            deliveryPartnerId: req.partner!.id
+        },
+        include: { user: { select: { name: true, email: true, phone: true } } }
+    })
 
+    if (!order) {
+        return res.status(404).json({ message: "Order not found" })
+    }
+
+    res.json({ order })
 }
