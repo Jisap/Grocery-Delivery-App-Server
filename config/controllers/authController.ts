@@ -30,7 +30,7 @@ export const register = async (req: Request, res: Response) => {
   }
 
   const existingUser = await prisma.user.findUnique({
-    where: { email: email.toLowercase() }
+    where: { email: email.toLowerCase() }
   });
 
   if (existingUser) {
@@ -41,7 +41,7 @@ export const register = async (req: Request, res: Response) => {
 
   const user = await prisma.user.create({
     data: {
-      name, email: email.toLowercase(),
+      name, email: email.toLowerCase(),
       password: hashedPassword
     }
   })
@@ -69,7 +69,7 @@ export const login = async (req: Request, res: Response) => {
   }
 
   const user = await prisma.user.findUnique({
-    where: { email: email.toLowercase() },
+    where: { email: email.toLowerCase() },
     include: { addresses: true }
   });
 
