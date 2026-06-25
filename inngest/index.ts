@@ -7,7 +7,10 @@ import { lowStockAlertTemplate } from "../templates/Lowstockalert.js";
 const LOW_STOCK_THRESHOLD = 10;
 
 // Create a client to send and receive events
-export const inngest = new Inngest({ id: "grocery-delivery" });
+export const inngest = new Inngest({
+	id: "grocery-delivery",                          // Ahora mismo esta en desarrollo con el server npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
+	isDev: true,                                     // En producción en vercel establecer una .env con NODE_ENV="production" y aqui : isDev: process.env.NODE_ENV !== "production",
+});
 
 // Low Stock Alert to Admin Email
 const checkLowStock = inngest.createFunction(

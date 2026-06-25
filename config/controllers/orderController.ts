@@ -161,18 +161,22 @@ export const createOrder = async (req: Request, res: Response) => {
     });
 
     // Enviar eventos a Inngest fuera de la transacción
-    const orderItems = order.items as any[];
-    for (const item of orderItems) {
-      await inngest.send({
-        name: "inventory/stock.updated",
-        data: { productId: item.product },
-      });
-    }
+    try {
+      const orderItems = order.items as any[];
+      for (const item of orderItems) {
+        await inngest.send({
+          name: "inventory/stock.updated",
+          data: { productId: item.product },
+        });
+      }
 
-    await inngest.send({
-      name: "order/placed",
-      data: { orderId: order.id },
-    });
+      await inngest.send({
+        name: "order/placed",
+        data: { orderId: order.id },
+      });
+    } catch (inngestErr) {
+      console.error("Failed to send events to Inngest:", inngestErr);
+    }
 
     res.json({ order });
   } catch (err: any) {
@@ -188,7 +192,7 @@ export const getUserOrders = async (req: Request, res: Response) => {
 
   const where: any = {                                                                      // Objeto que define filtros de búsqueda para órdenes
     userId: req.user!.id,                                                                   // Filtra solo órdenes del usuario actual
-    NOT: [{ PaymentMethod: "card", isPaid: false }]                                         // Excluye órdenes pagadas con tarjeta que aún no están pagadas
+    NOT: [{ paymentMethod: "card", isPaid: false }]                                         // Excluye órdenes pagadas con tarjeta que aún no están pagadas
   }
 
   if (status && status !== "all") {                                                         // Si recibimos parámetro de status
