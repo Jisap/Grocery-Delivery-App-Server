@@ -45,7 +45,7 @@ export const loginPartner = async (req: Request, res: Response) => {
   const token = generateToken(partner.id);                                          // genera el token
   const { password: _, ...partnerData } = partner                                   // spread operator para extraer el password y guardar el resto en partnerData
 
-  res.json({ ...partnerData, token })                                               // devuelve el partnerData con el nuevo token
+  res.json({ token, partner: partnerData })                                         // devuelve el partnerData con el nuevo token
 }
 
 // Get assigned deliveries
@@ -56,9 +56,9 @@ export const getMyDeliveries = async (req: Request, res: Response) => {
   const where: any = { deliveryPartnerId: req.partner!.id }                         // crea un objeto where con el id del partner
 
   if (status === "active") {                                                        // si el status es active
-    where.status = { in: ["Assigned", "Packed", "Out for delivery"] }             // filtra las entregas que esten en estado Assigned, Packed u Out for delivery
+    where.status = { in: ["Assigned", "Packed", "Out for delivery"] }               // filtra las entregas que esten en estado Assigned, Packed u Out for delivery
   } else if (status === "completed") {                                              // si el status es completed
-    where.status = { in: ["Delivered", "Cancelled"] }                             // filtra las entregas que esten en estado Delivered o Cancelled
+    where.status = { in: ["Delivered", "Cancelled"] }                               // filtra las entregas que esten en estado Delivered o Cancelled
   }
 
   const orders = await prisma.order.findMany({
