@@ -56,28 +56,46 @@ export const getProducts = async (req: Request, res: Response) => {
   const where: any = {};
   if (category && category !== "all") where.category = category as string;
   if (search) where.name = { contains: search as string, mode: "insensitive" };
-  if (organic === "true") where.organic = true;
+  if (organic === "true") where.isOrganic = true;
   if (minPrice || maxPrice) {
     where.price = {};
     if (minPrice) where.price.gte = Number(minPrice);
     if (maxPrice) where.price.lte = Number(maxPrice);
   }
 
-  const orderBy: any = {};
-  if (sort === "price_asc") orderBy.price = "asc";
-  else if (sort === "price_desc") orderBy.price = "desc";
-  else if (sort === "rating") orderBy.rating = "desc";
-  else if (sort === "name") orderBy.name = "asc";
-  else orderBy.createdAt = "desc";
+  const orderBy: any = [];
+  if (sort === "price_asc") orderBy.push({ price: "asc" });
+  else if (sort === "price_desc") orderBy.push({ price: "desc" });
+  else if (sort === "rating") orderBy.push({ rating: "desc" });
+  else if (sort === "name") orderBy.push({ name: "asc" });
+  else orderBy.push({ createdAt: "desc" });
+  orderBy.push({ id: "asc" });
 
-  const pageNumber = Number(page) || 1;
-  const limitNumber = Number(limit) || 12;
-  const skip = (pageNumber - 1) * limitNumber;
+  const isPaginated = page !== undefined || limit !== undefined;
 
-  const [products, total] = await prisma.$transaction([
-    prisma.product.findMany({ where, orderBy, skip, take: limitNumber }),
-    prisma.product.count({ where })
-  ]);
+  let products;
+  let total;
+  let totalPages = 1;
+  let pageNumber = 1;
+
+  // Si se envían parámetros de paginación, se hace una transacción con findMany y count.
+  if (isPaginated) {
+    pageNumber = Number(page) || 1;
+    const limitNumber = Number(limit) || 12;
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const [paginatedProducts, count] = await prisma.$transaction([
+      prisma.product.findMany({ where, orderBy, skip, take: limitNumber }),
+      prisma.product.count({ where })
+    ]);
+    products = paginatedProducts;
+    total = count;
+    totalPages = Math.ceil(total / limitNumber);
+  } else {
+    // Si no se envían parámetros de paginación, se hace una búsqueda normal.
+    products = await prisma.product.findMany({ where, orderBy });
+    total = products.length;
+  }
 
   const productsWithDiscount = products.map((p: any) => {
     const discount = p.originalPrice && p.price
@@ -88,7 +106,7 @@ export const getProducts = async (req: Request, res: Response) => {
 
   res.json({
     products: productsWithDiscount,
-    totalPages: Math.ceil(total / limitNumber),
+    totalPages,
     currentPage: pageNumber,
     total
   });
@@ -114,17 +132,31 @@ export const getProduct = async (req: Request, res: Response) => {
 
 // POST /api/products
 export const createProduct = async (req: Request, res: Response) => {
-  const product = await prisma.product.create({ data: req.body });
-  res.status(201).json({ product })
-};
+  try {
+    const { name, description, price, originalPrice, image, category, unit, stock, isOrganic } = req.body;
+    const product = await prisma.product.create({
+      data: { name, description, price, originalPrice, image, category, unit, stock, isOrganic }
+    });
+    res.status(201).json({ product });
+  } catch (error: any) {
+    console.error(error);
+    res.status(400).json({ message: error.message });
+  }
+}
 
 // PUT /api/products/:id
 export const updateProduct = async (req: Request, res: Response) => {
-  const product = await prisma.product.update({
-    where: { id: req.params.id as string },
-    data: req.body
-  });
-  res.json({ product })
+  try {
+    const { name, description, price, originalPrice, image, category, unit, stock, isOrganic } = req.body;
+    const product = await prisma.product.update({
+      where: { id: req.params.id as string },
+      data: { name, description, price, originalPrice, image, category, unit, stock, isOrganic }
+    });
+    res.json({ product });
+  } catch (error: any) {
+    console.error(error);
+    res.status(400).json({ message: error.message });
+  }
 };
 
 // DELETE /api/products/:id
