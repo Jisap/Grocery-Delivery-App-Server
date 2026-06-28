@@ -182,6 +182,10 @@ export const updateDeliveryStatus = async (req: Request, res: Response) => {
     }
   })
 
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
   const history = order!.statusHistory as any[];
 
   history.push({
