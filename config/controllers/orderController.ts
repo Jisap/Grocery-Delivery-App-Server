@@ -78,13 +78,16 @@ export const createOrder = async (req: Request, res: Response) => {
       });
 
       // 2. Si NO es pago con tarjeta, descontamos el stock aquí mismo
-      for (const item of orderItems) {                                                    // Se procede a decrementar el stock de cada producto
-        const result = await tx.product.updateMany({
-          where: { id: item.product, stock: { gte: item.quantity } },
-          data: { stock: { decrement: item.quantity } },
-        });
-        if (result.count === 0) {
-          throw new Error(`Product ${item.name} is out of stock`);
+      // Para tarjeta, el stock se descuenta en el webhook cuando Stripe confirma el pago
+      if (paymentMethod !== "card") {
+        for (const item of orderItems) {                                                    // Se procede a decrementar el stock de cada producto
+          const result = await tx.product.updateMany({
+            where: { id: item.product, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+          });
+          if (result.count === 0) {
+            throw new Error(`Product ${item.name} is out of stock`);
+          }
         }
       }
 
@@ -111,7 +114,10 @@ export const createOrder = async (req: Request, res: Response) => {
           },
         ],
         mode: 'payment',
-        metadata: { orderId: order.id }
+        metadata: { orderId: order.id },
+        payment_intent_data: {
+          metadata: { orderId: order.id } // ⚠️ NECESARIO: los metadata del session NO se copian automáticamente al PaymentIntent
+        }
       });
 
       // Devolvemos la URL para que el frontend redirija a Stripe
