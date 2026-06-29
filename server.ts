@@ -17,7 +17,13 @@ const app = express();
 app.post("/api/stripe", express.raw({ type: "application/json" }), stripeWebhook)
 
 // Middleware
-app.use(cors())
+app.use(cors({
+    origin: [
+        'http://localhost:5173',              // Desarrollo local
+        'https://grocery-delivery-app-server-ecru.vercel.app/',     // Producción
+    ],
+    credentials: true,
+}));
 app.use(express.json());
 
 
