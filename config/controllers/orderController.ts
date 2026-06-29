@@ -6,6 +6,9 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma.js";
 import { inngest } from "../../inngest/index.js";
+import Stripe from "stripe";
+
+
 
 
 
@@ -29,6 +32,7 @@ export const createOrder = async (req: Request, res: Response) => {
     // Usamos $transaction para crear la orden de manera atómica: 
     // si algo falla, se revierte todo. Recordar que tenemos 3 operaciones
     // que podrían fallar: tx.product.findMany, tx.order.create, tx.product.updateMany 
+    // 1. Transacción de BD: Validar stock, crear orden y (si aplica) descontar stock
     const order = await prisma.$transaction(async (tx) => {
       const productIds = items.map((i: any) => i.product);                               // Cada elemento i es un objeto: { "product": "64f1a2b3c4d5e6f7", "quantity": 2 }. De este objeto obtenemos el product que corresponde con el id
       const products = await tx.product.findMany({ where: { id: { in: productIds } } }); // Buscamos todos los productos que coincidan con los ids obtenidos
@@ -56,6 +60,9 @@ export const createOrder = async (req: Request, res: Response) => {
       const tax = Math.round(subtotal * 0.08 * 100) / 100;                               // tax = 8% del subtotal redondeado a 2 decimales.
       const total = Math.round((subtotal + deliveryFee + tax) * 100) / 100;              // total = suma de los tres, también redondeado.
 
+      // Si es tarjeta, el estado inicial es "Pending". Si es otro método, es "Placed".
+      const initialStatus = paymentMethod === "card" ? "Pending" : "Placed";
+
       const created = await tx.order.create({                                            // Se crea el registro Order en la base de datos con todos los datos calculados, más un statusHistory inicial con estado "Placed". En este punto la orden ya existe en la BD, pero el stock todavía no se descontó y el pago todavía no se procesó. 
         data: {
           userId: req.user!.id,
@@ -66,14 +73,11 @@ export const createOrder = async (req: Request, res: Response) => {
           deliveryFee,
           tax,
           total,
-          statusHistory: [{ status: "Placed", note: "Order placed Successfully", timestamp: new Date() }],
+          statusHistory: [{ status: initialStatus, note: "Order created", timestamp: new Date() }],
         },
       });
 
-      if (paymentMethod === "card") {
-        //Stripe payment link
-      }
-
+      // 2. Si NO es pago con tarjeta, descontamos el stock aquí mismo
       for (const item of orderItems) {                                                    // Se procede a decrementar el stock de cada producto
         const result = await tx.product.updateMany({
           where: { id: item.product, stock: { gte: item.quantity } },
@@ -85,9 +89,36 @@ export const createOrder = async (req: Request, res: Response) => {
       }
 
       return created;
-    });
+    });// Fin de la transacción de Prisma
 
-    // Enviar eventos a Inngest fuera de la transacción
+    // 3. Si es pago con tarjeta, creamos la sesión de Stripe FUERA de la transacción
+    if (paymentMethod === "card") {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
+
+      const session = await stripe.checkout.sessions.create({
+        success_url: `${req.headers.origin}/orders?clearCart=true`,
+        cancel_url: `${req.headers.origin}/checkout`,
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: "Payment Groceries"
+              },
+              unit_amount: Math.round(order.total * 100),
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        metadata: { orderId: order.id }
+      });
+
+      // Devolvemos la URL para que el frontend redirija a Stripe
+      return res.json({ url: session.url })
+    }
+
+    // 4º Enviar eventos a Inngest fuera de la transacción solo si el pago no es con tarjeta
     try {
       const orderItems = order.items as any[];
       for (const item of orderItems) {
