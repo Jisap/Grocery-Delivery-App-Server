@@ -20,7 +20,7 @@ app.post("/api/stripe", express.raw({ type: "application/json" }), stripeWebhook
 app.use(cors({
     origin: [
         'http://localhost:5173',              // Desarrollo local
-        'https://grocery-delivery-app-server-ecru.vercel.app/',     // Producción
+        // 'https://TU-FRONTEND.vercel.app',  // TODO: añadir cuando se despliegues el cliente
     ],
     credentials: true,
 }));
